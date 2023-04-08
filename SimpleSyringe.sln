@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleSyringe.ReflectiveInjectio", "SimpleSyringe.ReflectiveInjectio\SimpleSyringe.ReflectiveInjectio.vcxproj", "{80F93B09-1716-4D79-A077-18612F8F7D21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -36,6 +38,14 @@ Global
 		{92F01E73-8D7D-40CD-BEF5-81DDA928AF3A}.Release|x64.Build.0 = Release|x64
 		{92F01E73-8D7D-40CD-BEF5-81DDA928AF3A}.Release|x86.ActiveCfg = Release|Win32
 		{92F01E73-8D7D-40CD-BEF5-81DDA928AF3A}.Release|x86.Build.0 = Release|Win32
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Debug|x64.ActiveCfg = Debug|x64
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Debug|x64.Build.0 = Debug|x64
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Debug|x86.ActiveCfg = Debug|Win32
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Debug|x86.Build.0 = Debug|Win32
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Release|x64.ActiveCfg = Release|x64
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Release|x64.Build.0 = Release|x64
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Release|x86.ActiveCfg = Release|Win32
+		{80F93B09-1716-4D79-A077-18612F8F7D21}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
