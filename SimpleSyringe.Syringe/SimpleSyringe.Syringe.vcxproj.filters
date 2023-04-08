@@ -45,6 +45,9 @@
     <ClCompile Include="ReflectiveGetProcAddress.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ReflectiveLoaderDefs.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CodeInjection.h">

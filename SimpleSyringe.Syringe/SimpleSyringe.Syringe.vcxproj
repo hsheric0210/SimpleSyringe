@@ -141,6 +141,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ReflectiveDLLInjection.cpp" />
     <ClCompile Include="ReflectiveGetProcAddress.cpp" />
+    <ClCompile Include="ReflectiveLoaderDefs.h" />
     <ClCompile Include="ReflectiveLoadLibrary.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
