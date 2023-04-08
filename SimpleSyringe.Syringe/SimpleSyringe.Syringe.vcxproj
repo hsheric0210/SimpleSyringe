@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\1</OutDir>
+    <OutDir>$(SolutionDir)$(Platform)\2</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\$(PlatformTarget)</OutDir>
@@ -133,7 +133,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BasicDLLInjection.cpp" />
+    <ClCompile Include="CallInjectedFunc.cpp" />
+    <ClCompile Include="CodeInjection.cpp" />
+    <ClCompile Include="DLLInjectionWithCodeInjection.cpp" />
+    <ClCompile Include="includes.h" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BasicDLLInjection.h" />
+    <ClInclude Include="CallInjectedFunc.h" />
+    <ClInclude Include="CodeInjection.h" />
+    <ClInclude Include="DLLInjectionWithCodeInjection.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

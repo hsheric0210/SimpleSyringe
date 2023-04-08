@@ -74,7 +74,7 @@
     <OutDir>$(SolutionDir)$(Configuration)\$(PlatformTarget)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\1</OutDir>
+    <OutDir>$(SolutionDir)$(Platform)\2</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
