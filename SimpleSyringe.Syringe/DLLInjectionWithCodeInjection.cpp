@@ -11,7 +11,7 @@ DWORD CodeInj_DllLoad(LPVOID lpParam)
 	((myMessageBoxW)(((myGetProcAddress)param->procs[1])(usr32, param->aliterals[1])))(nullptr, (LPCWSTR)mem, param->wliterals[3], 0); // print module handle
 	((myVirtualFree)param->procs[3])(mem, 0, MEM_RELEASE);
 
-	return (DWORD)mod; // We can't use return value because HMODULE is HANDLE, which is 64-bit when the x64
+	return (DWORD)mod; // We can't use return value because on 64-bit systems, we'll hit a pointer truncation problem
 	// We should try different way.
 }
 
@@ -41,7 +41,7 @@ DWORD CodeInjection_DLL_Load(HANDLE process, LPCWSTR dll)
 
 	wcscpy_s(param.wliterals[0], 1024, L"user32.dll");
 	wcscpy_s(param.wliterals[1], 1024, dll);
-	wcscpy_s(param.wliterals[2], 1024, L"DLL Load @ %p");
+	wcscpy_s(param.wliterals[2], 1024, L"DLL loaded at memory 0x%p");
 	wcscpy_s(param.wliterals[3], 1024, L"DLL-Injection by Code Injection");
 
 	//DWORD size = (DWORD)CodeInj_DllLoad_End - (DWORD)CodeInj_DllLoad; // This sometimes returns very big value
@@ -59,7 +59,7 @@ DWORD CodeInjection_DLL_Unload(HANDLE process, ULONGLONG moduleBase)
 
 	//DWORD size = (DWORD)CodeInj_DllUnload_End - (DWORD)CodeInj_DllUnload;
 	DWORD size = 16384;
-	return CodeInjection(process, 16384, (FARPROC)CodeInj_DllUnload, sizeof(CODEINJ_DLL_UNLOAD_PARAM), (LPVOID)&param);
+	return CodeInjection(process, size, (FARPROC)CodeInj_DllUnload, sizeof(CODEINJ_DLL_UNLOAD_PARAM), (LPVOID)&param);
 }
 
 BOOL Code_DLLInjection(DWORD pid, HANDLE process, LPWSTR moduleName)

@@ -1,6 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "includes.h"
-#include "DLLInjectionWithCodeInjection.h"
+#include "BasicDLLInjection.h"
 
 int wmain(int argc, WCHAR *argv[])
 {
@@ -35,7 +35,7 @@ int wmain(int argc, WCHAR *argv[])
 		return FALSE;
 
 */
-	Code_DLLInjection(procinfo.dwProcessId, procinfo.hProcess, argv[2]);
+	Basic_DLLInjection(procinfo.dwProcessId, procinfo.hProcess, argv[2]);
 	CloseHandle(procinfo.hProcess);
 
 	return 0;

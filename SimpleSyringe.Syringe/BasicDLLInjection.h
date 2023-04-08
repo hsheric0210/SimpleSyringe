@@ -1,4 +1,5 @@
 #pragma once
 #include "includes.h"
+#include "utils.h"
 #include "CallInjectedFunc.h"
-BOOL DLLInjection(DWORD pid, LPWSTR moduleName);
+BOOL Basic_DLLInjection(DWORD pid, HANDLE process, LPWSTR moduleName);

@@ -36,6 +36,9 @@
     <ClCompile Include="DLLInjectionWithCodeInjection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ReflectiveDLLInjection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CodeInjection.h">
@@ -51,6 +54,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DLLInjectionWithCodeInjection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflectiveDLLInjection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -63,7 +63,7 @@ BOOL FindModule(DWORD pid, LPWSTR moduleName, PMODULEENTRY32W entry)
 		cout << "[FindModule] Specified module not found. (maybe not loaded yet)\n";
 		return FALSE;
 	}
-	wcout << "[FindModule] Specified module '" << moduleEntry.szExePath << "'found. Base address is 0x" << moduleEntry.modBaseAddr << "\n";
+	wcout << "[FindModule] Specified module '" << moduleEntry.szExePath << "' found. Base address is 0x" << moduleEntry.modBaseAddr << "\n";
 
 	*entry = moduleEntry;
 	return TRUE;
