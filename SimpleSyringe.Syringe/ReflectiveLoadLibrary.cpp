@@ -1,9 +1,9 @@
 #include "ReflectiveLoadLibrary.h"
 #include <stdio.h>
 
-DWORD Rva2Offset(DWORD rva, UINT_PTR baseAddress)
+DWORD Rva2Offset64(DWORD rva, UINT_PTR baseAddress)
 {
-	PIMAGE_NT_HEADERS ntHeader = (PIMAGE_NT_HEADERS)(baseAddress + ((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew);
+	auto ntHeader = (PIMAGE_NT_HEADERS64)(baseAddress + ((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew);
 
 	PIMAGE_SECTION_HEADER sectionHeader = (PIMAGE_SECTION_HEADER)((UINT_PTR)(&ntHeader->OptionalHeader) + ntHeader->FileHeader.SizeOfOptionalHeader);
 
@@ -19,47 +19,76 @@ DWORD Rva2Offset(DWORD rva, UINT_PTR baseAddress)
 	return 0;
 }
 
-DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress)
+DWORD Rva2Offset32(DWORD rva, UINT_PTR baseAddress)
 {
-#ifdef _WIN64
-	DWORD compileArch = 2;
-#else
-	// This will catch Win32 and WinRT.
-	DWORD compileArch = 1;
-#endif
+	auto ntHeader = (PIMAGE_NT_HEADERS32)(baseAddress + ((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew);
 
+	PIMAGE_SECTION_HEADER sectionHeader = (PIMAGE_SECTION_HEADER)((UINT_PTR)(&ntHeader->OptionalHeader) + ntHeader->FileHeader.SizeOfOptionalHeader);
+
+	if (rva < sectionHeader[0].PointerToRawData)
+		return rva;
+
+	for (WORD i = 0; i < ntHeader->FileHeader.NumberOfSections; i++)
+	{
+		if (rva >= sectionHeader[i].VirtualAddress && rva < (sectionHeader[i].VirtualAddress + sectionHeader[i].SizeOfRawData))
+			return (rva - sectionHeader[i].VirtualAddress + sectionHeader[i].PointerToRawData);
+	}
+
+	return 0;
+}
+
+DWORD Rva2Offset(DWORD rva, UINT_PTR baseAddress, bool is64)
+{
+
+	return is64 ? Rva2Offset64(rva, baseAddress) : Rva2Offset32(rva, baseAddress);
+}
+
+DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress, LPCSTR procName)
+{
 	// get the File Offset of the modules NT Header
 	UINT_PTR ntHeader = baseAddress + ((PIMAGE_DOS_HEADER)baseAddress)->e_lfanew;
+	BOOL is64 = FALSE;
 
 	// currenlty we can only process a PE file which is the same type as the one this fuction has 
 	// been compiled as, due to various offset in the PE structures being defined at compile time.
+	UINT_PTR exportDirectory;
 	if (((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.Magic == 0x010B) // PE32
 	{
-		if (compileArch != 1)
-			return 0;
+		exportDirectory = (UINT_PTR) & ((PIMAGE_NT_HEADERS32)ntHeader)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 	}
 	else if (((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.Magic == 0x020B) // PE64
 	{
-		if (compileArch != 2)
-			return 0;
+		is64 = TRUE;
+		exportDirectory = (UINT_PTR) & ((PIMAGE_NT_HEADERS64)ntHeader)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 	}
 	else
 		return 0;
 
 	// uiNameArray = the address of the modules export directory entry
-	auto exportDirectory = (UINT_PTR) & ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 
 	// get the File Offset of the export directory
-	UINT_PTR exportDirectoryOffset = baseAddress + Rva2Offset(((PIMAGE_DATA_DIRECTORY)exportDirectory)->VirtualAddress, baseAddress);
+	UINT_PTR exportDirectoryOffset = baseAddress + Rva2Offset(((PIMAGE_DATA_DIRECTORY)exportDirectory)->VirtualAddress, baseAddress, is64);
 
 	// get the File Offset for the array of name pointers
-	UINT_PTR nameOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfNames, baseAddress);
+	UINT_PTR nameOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfNames, baseAddress, is64);
 
 	// get the File Offset for the array of addresses
-	UINT_PTR funcOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfFunctions, baseAddress);
+	UINT_PTR funcOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfFunctions, baseAddress, is64);
 
 	// get the File Offset for the array of name ordinals
-	UINT_PTR nameOrdinalOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfNameOrdinals, baseAddress);
+	UINT_PTR nameOrdinalOffsets = baseAddress + Rva2Offset(((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->AddressOfNameOrdinals, baseAddress, is64);
+
+	// test if we are importing by name or by ordinal...
+	if (!((DWORD_PTR)procName >> 16))
+	{
+		// import by ordinal...
+
+		// use the import ordinal (- export ordinal base) as an index into the array of addresses
+		funcOffsets += ((IMAGE_ORDINAL((DWORD)procName) - ((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->Base) * sizeof(DWORD));
+
+		// resolve the address for this imported function
+		return Rva2Offset(DEREF_32(funcOffsets), funcOffsets, is64);
+	}
 
 	// get a counter for the number of exported functions...
 	DWORD nameCount = ((PIMAGE_EXPORT_DIRECTORY)exportDirectoryOffset)->NumberOfNames;
@@ -67,9 +96,9 @@ DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress)
 	// loop through all the exported functions to find the ReflectiveLoader
 	while (nameCount--)
 	{
-		char *funcName = (char *)(baseAddress + Rva2Offset(DEREF_32(nameOffsets), baseAddress));
+		char *funcName = (char *)(baseAddress + Rva2Offset(DEREF_32(nameOffsets), baseAddress, is64));
 
-		if (strstr(funcName, "ReflectiveLoader") != NULL)
+		if (strstr(funcName, procName) != NULL)
 		{
 			/*
 			// get the File Offset for the array of addresses
@@ -80,7 +109,7 @@ DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress)
 			*/
 
 			// return the File Offset to the ReflectiveLoader() functions code...
-			return Rva2Offset(DEREF_32(funcOffsets + (DEREF_16(nameOrdinalOffsets) * sizeof(DWORD))), baseAddress);
+			return Rva2Offset(DEREF_32(funcOffsets + (DEREF_16(nameOrdinalOffsets) * sizeof(DWORD))), baseAddress, is64);
 		}
 		// get the next exported function name
 		nameOffsets += sizeof(DWORD);
@@ -93,7 +122,7 @@ DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress)
 }
 
 // Loads a DLL image from memory via its exported ReflectiveLoader function
-HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength)
+HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength, LPCSTR procName)
 {
 	HMODULE moduleHandle = nullptr;
 
@@ -103,7 +132,7 @@ HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength)
 	__try
 	{
 		// check if the library has a ReflectiveLoader...
-		DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)baseAddress);
+		DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)baseAddress, procName);
 		if (reflectiveLoaderOffset)
 		{
 			REFLECTIVELOADER reflectiveLoader = (REFLECTIVELOADER)((UINT_PTR)baseAddress + reflectiveLoaderOffset);
@@ -144,7 +173,7 @@ HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength)
 // Note: If you are passing in an lpParameter value, if it is a pointer, remember it is for a different address space.
 // Note: This function currently cant inject accross architectures, but only to architectures which are the 
 //       same as the arch this function is compiled as, e.g. x86->x86 and x64->x64 but not x64->x86 or x86->x64.
-LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LPVOID param)
+LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LPCSTR procName, LPVOID param)
 {
 	using namespace std;
 	__try
@@ -155,19 +184,27 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 				break;
 
 			// check if the library has a ReflectiveLoader...
-			DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)myBuffer);
+			DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)myBuffer, procName);
+			cout << "[LoadRemoveLibraryR] Reflective Loader offset " << reflectiveLoaderOffset << " / error code " << GetLastError() << '\n';
 			if (!reflectiveLoaderOffset)
 				break;
 
 			// alloc memory (RWX) in the host process for the image...
-			LPVOID buffer = VirtualAllocEx(process, NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-			cout << "Allocated target process memory " << buffer << " / error code " << GetLastError() << '\n';
+			LPVOID buffer = VirtualAllocEx(process, NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			cout << "[LoadRemoveLibraryR] Allocated target process memory " << buffer << " / error code " << GetLastError() << '\n';
 			if (!buffer)
 				break;
 
 			// write the image into the host process...
 			BOOL state = WriteProcessMemory(process, buffer, myBuffer, size, nullptr);
-			cout << "Write DLL image to target process / error code " << GetLastError() << '\n';
+			cout << "[LoadRemoveLibraryR] Write DLL image to target process / error code " << GetLastError() << '\n';
+			if (!state)
+				break;
+
+			//https://github.com/rapid7/ReflectiveDLLInjection/commit/31c8f04046833b5e9b9d9bb4fc3e5d2f747af509
+			DWORD oldProtect;
+			state = VirtualProtectEx(process, buffer, size, PAGE_EXECUTE_READ, &oldProtect);
+			cout << "[LoadRemoveLibraryR] Changed page protect mode -> WX to bypass memory protection / error code " << GetLastError() << '\n';
 			if (!state)
 				break;
 

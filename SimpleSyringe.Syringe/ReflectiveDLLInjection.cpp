@@ -72,11 +72,10 @@ BOOL Reflective_DLLInjection(DWORD pid, HANDLE process, LPWSTR moduleName)
 	WriteProcessMemory(process, paramMem, msg, 1024 * sizeof(WCHAR), nullptr);
 	delete[]msg;
 
-	auto myModuleBase = (HMODULE)LoadRemoteLibraryR(process, heap, dllFileSize, paramMem);
+	auto myModuleBase = (HMODULE)LoadRemoteLibraryR(process, heap, dllFileSize, "ReflectiveLoader", paramMem);
 	cout << "[ReflectiveDLLInjection] Injection -> loaded at base " << myModuleBase << " / error code " << GetLastError() << '\n';
 	if (!myModuleBase)
 		return FALSE;
 
-	//WaitForSingleObject(myModule, INFINITE);
 	HeapFree(heap, 0, nullptr);
 }

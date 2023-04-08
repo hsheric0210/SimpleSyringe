@@ -24,10 +24,12 @@ __declspec(noinline) ULONG_PTR caller(VOID)
 DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 {
 	// the functions we need
-	MyLoadLibraryA myLoadLibraryA = NULL;
-	MyGetProcAddress myGetProcAddress = NULL;
-	MyVirtualAlloc myVirtualAlloc = NULL;
-	MyNtFlushInstructionCache myNtFlushInstructionCache = NULL;
+	MyLoadLibraryA myLoadLibraryA = nullptr;
+	MyGetProcAddress myGetProcAddress = nullptr;
+	MyVirtualAlloc myVirtualAlloc = nullptr;
+	MyVirtualProtect myVirtualProtect = nullptr;
+	MyVirtualLock myVirtualLock = nullptr;
+	MyNtFlushInstructionCache myNtFlushInstructionCache = nullptr;
 
 #pragma region("STEP 0: calculate our images current base address")
 
@@ -99,7 +101,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 		// compare the hash with that of kernel32.dll
 		if (dllNameHash == KERNEL32DLL_HASH)
 		{
-#pragma region ("kernel32.dll - LoadLibraryA, GetProcAddress, VirtualAlloc")
+#pragma region ("kernel32.dll - LoadLibraryA, GetProcAddress, VirtualAlloc, VirtualProtect, VirtualLock")
 			// get this modules base address
 			auto dllBase = (ULONG_PTR)((PLDR_DATA_TABLE_ENTRY)inMemoryOrderModuleEntry)->DllBase;
 
@@ -118,7 +120,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 			// get the VA for the array of name ordinals
 			ULONG_PTR nameOrdinals = (dllBase + ((PIMAGE_EXPORT_DIRECTORY)exportDirVA)->AddressOfNameOrdinals);
 
-			DWORD funcCount = 3;
+			DWORD funcCount = 5;
 
 			// loop while we still have imports to find
 			while (funcCount > 0)
@@ -127,21 +129,25 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 				DWORD nameHash = hash((char *)(dllBase + DEREF_32(names)));
 
 				// if we have found a function we want we get its virtual address
-				if (nameHash == LOADLIBRARYA_HASH || nameHash == GETPROCADDRESS_HASH || nameHash == VIRTUALALLOC_HASH)
+				if (nameHash == LOADLIBRARYA_HASH || nameHash == GETPROCADDRESS_HASH || nameHash == VIRTUALALLOC_HASH || nameHash == VIRTUALPROTECT_HASH || nameHash == VIRTUALLOCK_HASH)
 				{
 					// get the VA for the array of addresses
-					UINT_PTR adress = (dllBase + ((PIMAGE_EXPORT_DIRECTORY)exportDirVA)->AddressOfFunctions);
+					UINT_PTR address = (dllBase + ((PIMAGE_EXPORT_DIRECTORY)exportDirVA)->AddressOfFunctions);
 
 					// use this functions name ordinal as an index into the array of name pointers
-					adress += (DEREF_16(nameOrdinals) * sizeof(DWORD));
+					address += (DEREF_16(nameOrdinals) * sizeof(DWORD));
 
 					// store this functions VA
 					if (nameHash == LOADLIBRARYA_HASH)
-						myLoadLibraryA = (MyLoadLibraryA)(dllBase + DEREF_32(adress));
+						myLoadLibraryA = (MyLoadLibraryA)(dllBase + DEREF_32(address));
 					else if (nameHash == GETPROCADDRESS_HASH)
-						myGetProcAddress = (MyGetProcAddress)(dllBase + DEREF_32(adress));
+						myGetProcAddress = (MyGetProcAddress)(dllBase + DEREF_32(address));
 					else if (nameHash == VIRTUALALLOC_HASH)
-						myVirtualAlloc = (MyVirtualAlloc)(dllBase + DEREF_32(adress));
+						myVirtualAlloc = (MyVirtualAlloc)(dllBase + DEREF_32(address));
+					else if (nameHash == VIRTUALPROTECT_HASH)
+						myVirtualProtect = (MyVirtualProtect)(dllBase + DEREF_32(address));
+					else if (nameHash == VIRTUALLOCK_HASH)
+						myVirtualLock = (MyVirtualLock)(dllBase + DEREF_32(address));
 
 					// decrement our counter
 					funcCount--;
@@ -211,7 +217,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 		}
 
 		// we stop searching when we have found everything we need.
-		if (myLoadLibraryA && myGetProcAddress && myVirtualAlloc && myNtFlushInstructionCache)
+		if (myLoadLibraryA && myGetProcAddress && myVirtualAlloc && myVirtualProtect && myVirtualLock && myNtFlushInstructionCache)
 			break;
 
 		// get the next entry
@@ -224,8 +230,10 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 	UINT_PTR ntHeader = libraryLocation + ((PIMAGE_DOS_HEADER)libraryLocation)->e_lfanew;
 
 	// allocate all the memory for the DLL to be loaded into. we can load at any address because we will  
-	// relocate the image. Also zeros all memory and marks it as READ, WRITE and EXECUTE to avoid any problems.
-	UINT_PTR buffer = (ULONG_PTR)myVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	// relocate the image. Also zeros all memory and marks it as READ and WRITE to avoid any problems.
+	UINT_PTR buffer = (ULONG_PTR)myVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, /*PAGE_READWRITE*/PAGE_EXECUTE_READWRITE); //Disabled because it will cause program crash anyway.
+
+	myVirtualLock((LPVOID)buffer, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage);
 
 	// we must now copy over the headers
 	DWORD headerSize = ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfHeaders;
@@ -242,7 +250,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 	UINT_PTR sectionEntry = ((ULONG_PTR) & ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader + ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.SizeOfOptionalHeader);
 
 	// iterate through all sections, loading them into memory.
-	DWORD sectionCount = ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.NumberOfSections;
+	WORD sectionCount = ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.NumberOfSections;
 	while (sectionCount--)
 	{
 		UINT_PTR remoteSectionVA = (buffer + ((PIMAGE_SECTION_HEADER)sectionEntry)->VirtualAddress);
@@ -277,7 +285,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 		// firstThunkVA = VA of the OriginalFirstThunk
 		UINT_PTR firstThunkVA = (buffer + ((PIMAGE_IMPORT_DESCRIPTOR)iatEntry)->OriginalFirstThunk);
 
-		// uiValueA = VA of the IAT (via first thunk not origionalfirstthunk)
+		// VA of the IAT (via first thunk not origionalfirstthunk)
 		ULONG_PTR iatVA = (buffer + ((PIMAGE_IMPORT_DESCRIPTOR)iatEntry)->FirstThunk);
 
 		// iterate through all imported functions, importing by ordinal if no name present
@@ -333,11 +341,14 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 	// check if their are any relocations present
 	if (((PIMAGE_DATA_DIRECTORY)relocDir)->Size)
 	{
+		//https://github.com/rapid7/ReflectiveDLLInjection/commit/449a37e7671b87bf931b6f8fb8d76b802eb1d421
+		DWORD sizeOfBlock = ((PIMAGE_BASE_RELOCATION)relocDir)->SizeOfBlock;
+
 		// the first entry (IMAGE_BASE_RELOCATION)
 		UINT_PTR remoteRelocEntry = (buffer + ((PIMAGE_DATA_DIRECTORY)relocDir)->VirtualAddress);
 
 		// and we iterate through all entries...
-		while (((PIMAGE_BASE_RELOCATION)remoteRelocEntry)->SizeOfBlock)
+		while (sizeOfBlock && ((PIMAGE_BASE_RELOCATION)remoteRelocEntry)->SizeOfBlock)
 		{
 			// the VA for this relocation block
 			UINT_PTR remoteRelocVA = (buffer + ((PIMAGE_BASE_RELOCATION)remoteRelocEntry)->VirtualAddress);
@@ -400,12 +411,55 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 			}
 
 			// get the next entry in the relocation directory
+			sizeOfBlock -= ((PIMAGE_BASE_RELOCATION)remoteRelocEntry)->SizeOfBlock;
 			remoteRelocEntry = remoteRelocEntry + ((PIMAGE_BASE_RELOCATION)remoteRelocEntry)->SizeOfBlock;
 		}
 	}
 #pragma endregion
 
-#pragma region("STEP 6: call our images entry point")
+#pragma region("STEP 6: iterate through all sections, applying protections - TEMPORARILY DISABLED")
+	sectionEntry = ((ULONG_PTR) & ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader + ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.SizeOfOptionalHeader);
+	sectionCount = ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.NumberOfSections;
+
+	// Characteristics processing courtesy of Dark Vort¢²x, 2021-06-01
+	// see: https://bruteratel.com/research/feature-update/2021/06/01/PE-Reflection-Long-Live-The-King/
+	while (sectionCount--)
+	{
+		// uiValueB is the VA for this section
+		UINT_PTR remoteSectionVA = (buffer + ((PIMAGE_SECTION_HEADER)sectionEntry)->VirtualAddress);
+
+		// get the sections memory protections value
+		DWORD dwProtect = 0;
+		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE)
+			dwProtect = PAGE_WRITECOPY;
+		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ)
+			dwProtect = PAGE_READONLY;
+		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
+			dwProtect = PAGE_READWRITE;
+		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE)
+			dwProtect = PAGE_EXECUTE;
+		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE))
+			dwProtect = PAGE_EXECUTE_WRITECOPY;
+		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
+			dwProtect = PAGE_EXECUTE_READ;
+		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
+			dwProtect = PAGE_EXECUTE_READWRITE;
+
+		DWORD sectionSize = ((PIMAGE_SECTION_HEADER)sectionEntry)->SizeOfRawData;
+
+		DWORD prevProtect;
+		if (sectionSize)
+		{
+			//Disabled because it will cause program crash anyway.
+			//myVirtualProtect((LPVOID)remoteSectionVA, sectionSize, PAGE_EXECUTE_READWRITE, &prevProtect);
+		}
+
+		// get the VA of the next section
+		sectionEntry += sizeof(IMAGE_SECTION_HEADER);
+	}
+#pragma endregion
+
+#pragma region("STEP 7: call our images entry point")
 	// the VA of our newly loaded DLL/EXE's entry point
 	UINT_PTR entryPointVA = (buffer + ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.AddressOfEntryPoint);
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "includes.h"
 #include "ReflectiveLoaderDefs.h"
-DWORD GetReflectiveLoaderOffset(VOID *lpReflectiveDllBuffer);
-HMODULE WINAPI LoadLibraryR(LPVOID lpBuffer, DWORD dwLength);
-HANDLE WINAPI LoadRemoteLibraryR(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPVOID lpParameter);
+DWORD GetReflectiveLoaderOffset(UINT_PTR baseAddress, LPCSTR procName);
+HMODULE WINAPI LoadLibraryR(LPVOID lpBuffer, DWORD dwLength, LPCSTR procName);
+HANDLE WINAPI LoadRemoteLibraryR(HANDLE hProcess, LPVOID lpBuffer, DWORD dwLength, LPCSTR procName, LPVOID lpParameter);

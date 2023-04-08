@@ -44,7 +44,7 @@ FARPROC WINAPI GetProcAddressR(HANDLE moduleHandle, LPCSTR procName)
 		cout << "[GetProcAddressR] Export proc name ordinal begin " << exportDirectoryVA << '\n';
 
 		// test if we are importing by name or by ordinal...
-		if (((DWORD)procName & 0xFFFF0000) == 0x00000000)
+		if (!((DWORD_PTR)procName >> 16))
 		{
 			cout << "[GetProcAddressR] By-ordinal\n";
 			// import by ordinal...
