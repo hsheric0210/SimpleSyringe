@@ -1,10 +1,15 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
-DWORD WINAPI tp(LPVOID lp)
+#define DllExport extern "C" __declspec(dllexport)
+
+DllExport DWORD TestFunction(LPWSTR message)
 {
-	MessageBoxA(nullptr, "Injectio", "P Hello, world!", 0);
-	return 0;
+	LPWSTR concat = new WCHAR[1024];
+	wsprintfW(concat, L"Test function called with message: %s", message); // this could cause buffer overflow, but i don't care cuz it is an test program
+	MessageBoxW(nullptr, concat, L"TestFunction", MB_OK | MB_ICONINFORMATION);
+	delete[] concat;
+	return 1337;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule,
@@ -19,8 +24,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		case DLL_PROCESS_DETACH:
 			break;
 		case DLL_PROCESS_ATTACH:
-			HANDLE ht = CreateThread(nullptr, 0, tp, nullptr, 0, nullptr);
-			CloseHandle(ht);
 			break;
 	}
 	return TRUE;
