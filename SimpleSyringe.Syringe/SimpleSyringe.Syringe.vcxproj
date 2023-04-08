@@ -140,6 +140,8 @@
     <ClCompile Include="includes.h" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ReflectiveDLLInjection.cpp" />
+    <ClCompile Include="ReflectiveGetProcAddress.cpp" />
+    <ClCompile Include="ReflectiveLoadLibrary.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -148,6 +150,8 @@
     <ClInclude Include="CodeInjection.h" />
     <ClInclude Include="DLLInjectionWithCodeInjection.h" />
     <ClInclude Include="ReflectiveDLLInjection.h" />
+    <ClInclude Include="ReflectiveGetProcAddress.h" />
+    <ClInclude Include="ReflectiveLoadLibrary.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
