@@ -48,6 +48,8 @@ int wmain(int argc, WCHAR *argv[])
 	}
 
 	HMODULE usr32 = LoadLibraryW(L"user32.dll");
+	// Call MessageBoxW without displaying it on Imports Table
+	// Strings are XOR-Encrypted to bypass AntiVirus string-signature-detection
 	((myMessageBoxW)GetProcAddressSilentObscured(10, L"\x32\x34\x22\x35\x74\x75\x69\x23\x2B\x2B", 11, "\x0A\x22\x34\x34\x26\x20\x22\x05\x28\x3F\x10"))(NULL, L"Silently loaded MessageBoxW", L"XDXDXDXDX", MB_OK | MB_ICONWARNING);
 
 	//TestInSpecifiedProcess(argv);
