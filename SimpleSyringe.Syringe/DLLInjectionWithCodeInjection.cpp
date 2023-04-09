@@ -8,7 +8,7 @@ DWORD CodeInj_DllLoad(LPVOID lpParam)
 	LPVOID mem = ((myVirtualAlloc)param->procs[2])(nullptr, 16384, MEM_COMMIT, PAGE_READWRITE); // allocate memory
 
 	((mywsprintfW)(((myGetProcAddress)param->procs[1])(usr32, param->aliterals[0])))((LPWSTR)mem, param->wliterals[2], mod);
-	((myMessageBoxW)(((myGetProcAddress)param->procs[1])(usr32, param->aliterals[1])))(nullptr, (LPCWSTR)mem, param->wliterals[3], 0); // print module handle
+	((MyMessageBoxW)(((myGetProcAddress)param->procs[1])(usr32, param->aliterals[1])))(nullptr, (LPCWSTR)mem, param->wliterals[3], 0); // print module handle
 	((myVirtualFree)param->procs[3])(mem, 0, MEM_RELEASE);
 
 	return (DWORD)mod; // We can't use return value because on 64-bit systems, we'll hit a pointer truncation problem

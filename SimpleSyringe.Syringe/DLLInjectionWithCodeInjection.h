@@ -5,7 +5,7 @@
 #include "utils.h"
 
 typedef HMODULE(WINAPI *myLoadLibrary)(LPCWSTR FileName);
-typedef INT(WINAPI *myMessageBoxW)(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
+typedef INT(WINAPI *MyMessageBoxW)(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
 typedef FARPROC(WINAPI *myGetProcAddress)(HMODULE module, LPCSTR funcName);
 typedef INT(WINAPIV *mywsprintfW)(LPWSTR buffer, LPCWSTR format, ...); // user32.dll
 typedef LPVOID(WINAPI *myVirtualAlloc)(LPVOID address, size_t size, DWORD allocType, DWORD protect);
