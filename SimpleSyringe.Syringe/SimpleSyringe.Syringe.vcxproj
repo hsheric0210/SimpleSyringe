@@ -124,7 +124,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <BrowseInformation> </BrowseInformation>
+      <BrowseInformation>
+      </BrowseInformation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -144,6 +145,7 @@
     <ClCompile Include="ReflectiveGetProcAddress.cpp" />
     <ClCompile Include="ReflectiveLoaderDefs.h" />
     <ClCompile Include="ReflectiveLoadLibrary.cpp" />
+    <ClCompile Include="GetProcAddressSilent.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -154,6 +156,7 @@
     <ClInclude Include="ReflectiveDLLInjection.h" />
     <ClInclude Include="ReflectiveGetProcAddress.h" />
     <ClInclude Include="ReflectiveLoadLibrary.h" />
+    <ClInclude Include="GetProcAddressSilent.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,56 +1,8 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <Winsock2.h>
-#include <intrin.h>
+#include "includes.h"
+#include <algorithm>
 
-#include "ReflectiveLoaderDefs.h"
-
-typedef HMODULE(WINAPI *MyLoadLibraryA)(LPCSTR);
-typedef FARPROC(WINAPI *MyGetProcAddress)(HMODULE, LPCSTR);
-typedef LPVOID(WINAPI *MyVirtualAlloc)(LPVOID, SIZE_T, DWORD, DWORD);
-typedef BOOL(WINAPI *MyVirtualProtect)(LPVOID, SIZE_T, DWORD, PDWORD);
-typedef LPVOID(WINAPI *MyVirtualLock)(LPVOID, SIZE_T);
-typedef DWORD(NTAPI *MyNtFlushInstructionCache)(HANDLE, PVOID, ULONG);
-
-#define KERNEL32DLL_HASH				0x6A4ABC5B
-#define NTDLLDLL_HASH					0x3CFA685D
-
-#define LOADLIBRARYA_HASH				0xEC0E4E8E
-#define GETPROCADDRESS_HASH				0x7C0DFCAA
-#define VIRTUALALLOC_HASH				0x91AFCA54
-#define VIRTUALPROTECT_HASH				0x7946C61B
-#define VIRTUALLOCK_HASH				0x0EF632F2
-#define NTFLUSHINSTRUCTIONCACHE_HASH	0x534C0AB8
-
-#define IMAGE_REL_BASED_ARM_MOV32A		5
-#define IMAGE_REL_BASED_ARM_MOV32T		7
-
-#define ARM_MOV_MASK					(DWORD)(0xFBF08000)
-#define ARM_MOV_MASK2					(DWORD)(0xFBF08F00)
-#define ARM_MOVW						0xF2400000
-#define ARM_MOVT						0xF2C00000
-
-#define HASH_KEY						13
-//===============================================================================================//
-#pragma intrinsic( _rotr )
-
-__forceinline DWORD ror(DWORD d)
-{
-	return _rotr(d, HASH_KEY);
-}
-
-__forceinline DWORD hash(char *c)
-{
-	register DWORD h = 0;
-	do
-	{
-		h = ror(h);
-		h += *c;
-	} while (*++c);
-
-	return h;
-}
+#define XOR_KEY 'G'
 
 typedef struct _UNICODE_STR
 {
@@ -172,3 +124,6 @@ typedef struct
 	WORD	offset : 12;
 	WORD	type : 4;
 } IMAGE_RELOC, *PIMAGE_RELOC;
+
+FARPROC GetProcAddressSilent(LPCWSTR libraryName, LPCSTR funcName);
+FARPROC GetProcAddressSilentObscured(DWORD libNameLen, LPCWSTR _libName, DWORD procNameLen, LPCSTR _procName);

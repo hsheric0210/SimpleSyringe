@@ -63,6 +63,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 #pragma region("STEP 1: process the kernels exports for the functions our loader needs...")
 
 	// get the Process Enviroment Block
+	//https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
 #ifdef _WIN64
 	ULONG_PTR peb = __readgsqword(0x60);
 #elif _WIN32
@@ -91,10 +92,10 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 		{
 			dllNameHash = ror(dllNameHash);
 			// normalize to uppercase if the madule name is in lowercase
-			if (*((BYTE *)moduleName) >= 'a')
-				dllNameHash += *((BYTE *)moduleName) - 0x20;
+			if (DEREF_8(moduleName) >= 'a')
+				dllNameHash += DEREF_8(moduleName) - 0x20;
 			else
-				dllNameHash += *((BYTE *)moduleName);
+				dllNameHash += DEREF_8(moduleName);
 			moduleName++;
 		} while (--moduleNameLength);
 

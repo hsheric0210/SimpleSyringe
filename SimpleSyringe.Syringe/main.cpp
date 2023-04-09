@@ -2,6 +2,42 @@
 #include "includes.h"
 //#include "BasicDLLInjection.h"
 #include "ReflectiveDLLInjection.h"
+#include "GetProcAddressSilent.h"
+
+typedef INT(WINAPI *myMessageBoxW)(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
+
+void TestInNewProcess(WCHAR *argv[])
+{
+	PWCHAR currentDir = new WCHAR[32768];
+	GetCurrentDirectoryW(32768, currentDir);
+	PROCESS_INFORMATION procinfo = { 0 };
+	STARTUPINFOW si = { 0 };
+	if (!CreateProcessW(L"C:\\Windows\\System32\\cmd.exe", nullptr, nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, currentDir, &si, &procinfo))
+	{
+		std::cout << "Failed to create process error code " << GetLastError() << '\n';
+	}
+
+	Reflective_DLLInjection(procinfo.dwProcessId, procinfo.hProcess, argv[2]);
+	CloseHandle(procinfo.hProcess);
+}
+
+void TestInSpecifiedProcess(WCHAR *argv[])
+{
+	PWSTR end;
+	DWORD pid = wcstol(argv[1], &end, 10);
+
+	std::cout << "[main] Finding process with pid " << pid << '\n';
+
+	// Open process
+	HANDLE process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+	std::cout << "[main] Process handle=" << process << ", error code " << GetLastError() << '\n';
+	if (!process)
+		return;
+
+
+	Reflective_DLLInjection(pid, process, argv[2]);
+	CloseHandle(process);
+}
 
 int wmain(int argc, WCHAR *argv[])
 {
@@ -11,34 +47,9 @@ int wmain(int argc, WCHAR *argv[])
 		return 0;
 	}
 
-	std::wcout << "pidparam: '" << argv[1] << "'\n";
-	PWSTR end;
-	//DWORD pid = wcstol(argv[1], &end, 10);
-	PWCHAR currentDir = new WCHAR[32768];
-	GetCurrentDirectoryW(32768, currentDir);
-	PROCESS_INFORMATION procinfo = { 0 };
-	STARTUPINFOW si = { 0 };
-	if (!CreateProcessW(L"C:\\Windows\\System32\\cmd.exe", nullptr, nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, currentDir, &si, &procinfo))
-	{
-		std::cout << "Failed to create process error code " << GetLastError() << '\n';
-		return 0;
-	}
-	//DLLInjection(pid, argv[2]);
+	HMODULE usr32 = LoadLibraryW(L"user32.dll");
+	((myMessageBoxW)GetProcAddressSilentObscured(10, L"\x32\x34\x22\x35\x74\x75\x69\x23\x2B\x2B", 11, "\x0A\x22\x34\x34\x26\x20\x22\x05\x28\x3F\x10"))(NULL, L"Silently loaded MessageBoxW", L"XDXDXDXDX", MB_OK | MB_ICONWARNING);
 
-	/*
-
-	cout << "DLLInj: Finding process with pid " << pid << '\n';
-
-	// Open process
-	process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-	cout << "DLLInj: Process handle=" << process << ", error code " << GetLastError() << '\n';
-	if (!process)
-		return FALSE;
-
-*/
-//Basic_DLLInjection(procinfo.dwProcessId, procinfo.hProcess, argv[2]);
-	Reflective_DLLInjection(procinfo.dwProcessId, procinfo.hProcess, argv[2]);
-	CloseHandle(procinfo.hProcess);
-
+	//TestInSpecifiedProcess(argv);
 	return 0;
 }
