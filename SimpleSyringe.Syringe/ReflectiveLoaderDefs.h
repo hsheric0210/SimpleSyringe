@@ -11,5 +11,5 @@
 #define DEREF_16(x) *(WORD *)(x)
 #define DEREF_8(x) *(BYTE *)(x)
 
-typedef ULONG_PTR(WINAPI *REFLECTIVELOADER)(VOID);
-typedef BOOL(WINAPI *DLLMAIN)(HINSTANCE, DWORD, LPVOID);
+typedef ULONG_PTR(WINAPI *MyReflectiveLoader)(VOID);
+typedef BOOL(WINAPI *MyDllMain)(HINSTANCE, DWORD, LPVOID);

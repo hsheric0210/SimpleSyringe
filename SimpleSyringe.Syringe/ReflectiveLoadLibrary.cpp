@@ -135,7 +135,7 @@ HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength, LPCSTR procName)
 		DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)baseAddress, procName);
 		if (reflectiveLoaderOffset)
 		{
-			REFLECTIVELOADER reflectiveLoader = (REFLECTIVELOADER)((UINT_PTR)baseAddress + reflectiveLoaderOffset);
+			MyReflectiveLoader reflectiveLoader = (MyReflectiveLoader)((UINT_PTR)baseAddress + reflectiveLoaderOffset);
 
 			// we must VirtualProtect the buffer to RWX so we can execute the ReflectiveLoader...
 			// this assumes lpBuffer is the base address of the region of pages and dwLength the size of the region
@@ -143,7 +143,7 @@ HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength, LPCSTR procName)
 			if (VirtualProtect(baseAddress, dwLength, PAGE_EXECUTE_READWRITE, &prevProtect))
 			{
 				// call the librarys ReflectiveLoader...
-				DLLMAIN dllMain = (DLLMAIN)reflectiveLoader();
+				MyDllMain dllMain = (MyDllMain)reflectiveLoader();
 				if (dllMain)
 				{
 					// call the loaded librarys DllMain to get its HMODULE
@@ -155,6 +155,10 @@ HMODULE WINAPI LoadLibraryR(LPVOID baseAddress, DWORD dwLength, LPCSTR procName)
 				DWORD _prevProtect = 0;
 				VirtualProtect(baseAddress, dwLength, prevProtect, &_prevProtect);
 			}
+		}
+		else
+		{
+			std::cout << "[LoadLibraryR] ReflectiveLoader '" << procName << "' offset not found.\n";
 		}
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
@@ -187,7 +191,9 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 			DWORD reflectiveLoaderOffset = GetReflectiveLoaderOffset((UINT_PTR)myBuffer, procName);
 			cout << "[LoadRemoveLibraryR] Reflective Loader offset " << reflectiveLoaderOffset << " / error code " << GetLastError() << '\n';
 			if (!reflectiveLoaderOffset)
-				break;
+			{
+				std::cout << "[LoadRemoteLibraryR] ReflectiveLoader '" << procName << "' offset not found.\n";
+			}
 
 			// alloc memory (RWX) in the host process for the image...
 			LPVOID buffer = VirtualAllocEx(process, NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -209,11 +215,11 @@ LPVOID WINAPI LoadRemoteLibraryR(HANDLE process, LPVOID myBuffer, DWORD size, LP
 				break;
 
 			// add the offset to ReflectiveLoader() to the remote library address...
-			auto lpReflectiveLoader = (LPTHREAD_START_ROUTINE)((ULONG_PTR)buffer + reflectiveLoaderOffset);
-			cout << "[LoadRemoveLibraryR] Reflective Loader address: " << lpReflectiveLoader << '\n';
+			auto threadEp = (LPTHREAD_START_ROUTINE)((ULONG_PTR)buffer + reflectiveLoaderOffset);
+			cout << "[LoadRemoveLibraryR] Reflective Loader address: " << threadEp << '\n';
 
 			// create a remote thread in the host process to call the ReflectiveLoader!
-			HANDLE hThread = CreateRemoteThread(process, nullptr, 1024 * 1024, lpReflectiveLoader, param, (DWORD)NULL, nullptr);
+			HANDLE hThread = CreateRemoteThread(process, nullptr, 1024 * 1024, threadEp, param, (DWORD)NULL, nullptr);
 			cout << "[LoadRemoteLibraryR] Remote thread " << hThread << " creation error code " << GetLastError() << '\n';
 			WaitForSingleObject(hThread, INFINITE);
 			CloseHandle(hThread);

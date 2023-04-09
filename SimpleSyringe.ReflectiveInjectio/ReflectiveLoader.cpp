@@ -231,7 +231,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 
 	// allocate all the memory for the DLL to be loaded into. we can load at any address because we will  
 	// relocate the image. Also zeros all memory and marks it as READ and WRITE to avoid any problems.
-	UINT_PTR buffer = (ULONG_PTR)myVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, /*PAGE_READWRITE*/PAGE_EXECUTE_READWRITE); //Disabled because it will cause program crash anyway.
+	UINT_PTR buffer = (ULONG_PTR)myVirtualAlloc(NULL, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); //Disabled because it will cause program crash anyway.
 
 	myVirtualLock((LPVOID)buffer, ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader.SizeOfImage);
 
@@ -417,8 +417,8 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 	}
 #pragma endregion
 
-#pragma region("STEP 6: iterate through all sections, applying protections - TEMPORARILY DISABLED")
-	sectionEntry = ((ULONG_PTR) & ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader + ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.SizeOfOptionalHeader);
+#pragma region("STEP 6: iterate through all sections, applying protections")
+	auto sectionHeaderEntry = (PIMAGE_SECTION_HEADER)((ULONG_PTR) & ((PIMAGE_NT_HEADERS)ntHeader)->OptionalHeader + ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.SizeOfOptionalHeader);
 	sectionCount = ((PIMAGE_NT_HEADERS)ntHeader)->FileHeader.NumberOfSections;
 
 	// Characteristics processing courtesy of Dark Vort¢²x, 2021-06-01
@@ -426,36 +426,37 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 	while (sectionCount--)
 	{
 		// uiValueB is the VA for this section
-		UINT_PTR remoteSectionVA = (buffer + ((PIMAGE_SECTION_HEADER)sectionEntry)->VirtualAddress);
+		UINT_PTR remoteSectionVA = (buffer + sectionHeaderEntry->VirtualAddress);
 
 		// get the sections memory protections value
-		DWORD dwProtect = 0;
-		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE)
-			dwProtect = PAGE_WRITECOPY;
-		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ)
-			dwProtect = PAGE_READONLY;
-		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
-			dwProtect = PAGE_READWRITE;
-		if (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE)
-			dwProtect = PAGE_EXECUTE;
-		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE))
-			dwProtect = PAGE_EXECUTE_WRITECOPY;
-		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
-			dwProtect = PAGE_EXECUTE_READ;
-		if ((((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_WRITE) && (((PIMAGE_SECTION_HEADER)sectionEntry)->Characteristics & IMAGE_SCN_MEM_READ))
-			dwProtect = PAGE_EXECUTE_READWRITE;
+		DWORD protect = 0;
+		if (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_WRITE)
+			protect = PAGE_WRITECOPY;
+		if (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_READ)
+			protect = PAGE_READONLY;
+		if ((sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_WRITE) && (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_READ))
+			protect = PAGE_READWRITE;
+		if (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_EXECUTE)
+			protect = PAGE_EXECUTE;
+		if ((sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_WRITE))
+			protect = PAGE_EXECUTE_WRITECOPY;
+		if ((sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_READ))
+			protect = PAGE_EXECUTE_READ;
+		if ((sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_EXECUTE) && (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_WRITE) && (sectionHeaderEntry->Characteristics & IMAGE_SCN_MEM_READ))
+			protect = PAGE_EXECUTE_READWRITE;
 
-		DWORD sectionSize = ((PIMAGE_SECTION_HEADER)sectionEntry)->SizeOfRawData;
+		DWORD sectionSize = sectionHeaderEntry->SizeOfRawData;
 
-		DWORD prevProtect;
 		if (sectionSize)
 		{
-			//Disabled because it will cause program crash anyway.
-			//myVirtualProtect((LPVOID)remoteSectionVA, sectionSize, PAGE_EXECUTE_READWRITE, &prevProtect);
+			//To change memory protection rule without any errors, you must disable SDL checks
+			//Configuration Properties > C/C++ > General > SDL checks
+			//Or the injected program will crash instantly
+			myVirtualProtect((LPVOID)remoteSectionVA, sectionSize, protect, &protect);
 		}
 
 		// get the VA of the next section
-		sectionEntry += sizeof(IMAGE_SECTION_HEADER);
+		sectionHeaderEntry += sizeof(IMAGE_SECTION_HEADER);
 	}
 #pragma endregion
 
@@ -468,7 +469,7 @@ DLLEXPORT ULONG_PTR WINAPI ReflectiveLoader(LPVOID parameter)
 
 	// call our respective entry point, fudging our hInstance value
 	// if we are injecting a DLL via LoadRemoteLibraryR we call DllMain and pass in our parameter (via the DllMain lpReserved parameter)
-	((DLLMAIN)entryPointVA)((HINSTANCE)buffer, DLL_PROCESS_ATTACH, parameter);
+	((MyDllMain)entryPointVA)((HINSTANCE)buffer, DLL_PROCESS_ATTACH, parameter);
 #pragma endregion
 
 	// STEP 8: return our new entry point address so whatever called us can call DllMain() if needed.
